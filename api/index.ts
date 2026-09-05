@@ -1,0 +1,96 @@
+import { generateStudyGuide, generateChatReply, CANDIDATE_MODELS } from '../src/server/geminiService.ts';
+
+function setCors(res: any) {
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
+  );
+}
+
+async function parseBody(req: any): Promise<any> {
+  if (req.body) {
+    if (typeof req.body === 'string') {
+      try {
+        return JSON.parse(req.body);
+      } catch {
+        return {};
+      }
+    }
+    return req.body;
+  }
+  return new Promise((resolve) => {
+    let raw = '';
+    req.on('data', (chunk: any) => {
+      raw += chunk;
+    });
+    req.on('end', () => {
+      try {
+        resolve(raw ? JSON.parse(raw) : {});
+      } catch {
+        resolve({});
+      }
+    });
+    req.on('error', () => resolve({}));
+  });
+}
+
+export default async function handler(req: any, res: any) {
+  setCors(res);
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
+  const url = req.url || '';
+
+  if (url.includes('study-mode')) {
+    if (req.method !== 'POST') {
+      return res.status(405).json({ error: 'Method not allowed. Use POST.' });
+    }
+    try {
+      const body = await parseBody(req);
+      const { topic, depth = 'Comprehensive Core', studentLevel = 'College Undergraduate' } = body || {};
+      if (!topic || typeof topic !== 'string') {
+        return res.status(400).json({ error: 'Topic string is required' });
+      }
+      const data = await generateStudyGuide({ topic, depth, studentLevel });
+      return res.status(200).json(data);
+    } catch (err: unknown) {
+      const error = err as Error;
+      return res.status(500).json({
+        error: error?.message || 'Failed to generate study guide from Gemini API',
+      });
+    }
+  }
+
+  if (url.includes('chat')) {
+    if (req.method !== 'POST') {
+      return res.status(405).json({ error: 'Method not allowed. Use POST.' });
+    }
+    try {
+      const body = await parseBody(req);
+      const { message, conversationHistory = [], topic = 'General Tech & CS' } = body || {};
+      if (!message || typeof message !== 'string') {
+        return res.status(400).json({ error: 'Message string is required' });
+      }
+      const data = await generateChatReply({ message, conversationHistory, topic });
+      return res.status(200).json(data);
+    } catch (err: unknown) {
+      const error = err as Error;
+      return res.status(500).json({
+        error: error?.message || 'Failed to generate answer from Gemini API',
+      });
+    }
+  }
+
+  // Health / Default
+  return res.status(200).json({
+    status: 'ok',
+    appName: 'Nexora AI Study Assistant',
+    hasApiKey: !!process.env.GEMINI_API_KEY,
+    primaryModel: CANDIDATE_MODELS[0],
+    timestamp: new Date().toISOString(),
+  });
+}
