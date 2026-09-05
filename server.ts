@@ -6,7 +6,7 @@ import {
   generateStudyGuide,
   generateChatReply,
   CANDIDATE_MODELS,
-} from './src/server/geminiService.ts';
+} from './src/server/geminiService';
 
 dotenv.config();
 

@@ -1,4 +1,4 @@
-import { generateChatReply } from '../src/server/geminiService.ts';
+import { generateChatReply } from '../src/server/geminiService';
 
 function setCors(res: any) {
   res.setHeader('Access-Control-Allow-Credentials', 'true');
