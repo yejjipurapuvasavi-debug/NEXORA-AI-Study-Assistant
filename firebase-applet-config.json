@@ -1,12 +1,10 @@
 {
-  "projectId": "juicy-elixir-zz37z",
-  "appId": "1:1016376039505:web:b70627660dd0c787654070",
-  "apiKey": "AIzaSyD0cHuXb8Rms730PYW42517s7rVwSLnZjg",
-  "authDomain": "juicy-elixir-zz37z.firebaseapp.com",
-  "firestoreDatabaseId": "ai-studio-nexoraaistudyass-62641b7e-08a5-4433-aedb-3da605c02aca",
-  "storageBucket": "juicy-elixir-zz37z.firebasestorage.app",
-  "messagingSenderId": "1016376039505",
-  "measurementId": "",
-  "oAuthClientId": "1016376039505-mhafvdngajnpborcpemfu00ki6kcvhpp.apps.googleusercontent.com",
-  "recaptchaSiteKey": ""
+  "projectId": "nexora-ai-study-assistant",
+  "appId": "1:292514743863:web:7c4d0b355e969a261e21b2",
+  "apiKey": "AIzaSyBAwFCwIPAO8FhELKFwmpj6nXebjQH8jTg",
+  "authDomain": "nexora-ai-study-assistant.firebaseapp.com",
+  "firestoreDatabaseId": "(default)",
+  "storageBucket": "nexora-ai-study-assistant.firebasestorage.app",
+  "messagingSenderId": "292514743863",
+  "measurementId": "G-ER80QFEELM"
 }
