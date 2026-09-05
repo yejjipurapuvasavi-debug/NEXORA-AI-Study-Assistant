@@ -1,4 +1,144 @@
-import { generateChatReply } from '../src/server/geminiService';
+import dotenv from 'dotenv';
+import { GoogleGenAI } from '@google/genai';
+
+try {
+  dotenv.config();
+} catch {
+  // Ignore in environments where dotenv is not required
+}
+
+const CANDIDATE_MODELS = ['gemini-3.1-flash-lite', 'gemini-flash-latest', 'gemini-3.8-flash'];
+
+function getGenAI() {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error(
+      'GEMINI_API_KEY is not configured. Please ensure GEMINI_API_KEY is added to your environment variables or Vercel Project Settings.'
+    );
+  }
+  return new GoogleGenAI({ apiKey });
+}
+
+interface GenerateOptions {
+  contents: any;
+  systemInstruction?: string;
+  temperature?: number;
+  responseMimeType?: string;
+  responseSchema?: any;
+}
+
+async function generateWithFallback(
+  ai: GoogleGenAI,
+  options: GenerateOptions
+): Promise<{ text: string; modelUsed: string }> {
+  let lastError: Error | null = null;
+
+  for (const modelName of CANDIDATE_MODELS) {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const config: Record<string, any> = {
+          temperature: options.temperature ?? 0.7,
+        };
+        if (options.systemInstruction) {
+          config.systemInstruction = options.systemInstruction;
+        }
+        if (options.responseMimeType) {
+          config.responseMimeType = options.responseMimeType;
+        }
+        if (options.responseSchema) {
+          config.responseSchema = options.responseSchema;
+        }
+
+        const response = await ai.models.generateContent({
+          model: modelName,
+          contents: options.contents,
+          config,
+        });
+
+        if (response && response.text) {
+          return { text: response.text, modelUsed: modelName };
+        }
+      } catch (err: unknown) {
+        const error = err as Error;
+        lastError = error;
+        const msg = error?.message || String(error);
+        const isTransient =
+          msg.includes('503') ||
+          msg.includes('high demand') ||
+          msg.includes('429') ||
+          msg.includes('UNAVAILABLE');
+
+        console.warn(`[Gemini] Model "${modelName}" (attempt ${attempt + 1}) encountered error: ${msg}`);
+
+        if (isTransient && attempt === 0) {
+          await new Promise((resolve) => setTimeout(resolve, 600));
+          continue;
+        }
+        break;
+      }
+    }
+  }
+
+  throw lastError || new Error('All candidate Gemini models failed to respond.');
+}
+
+interface ChatParams {
+  message: string;
+  conversationHistory?: Array<{ sender: string; text: string }>;
+  topic?: string;
+}
+
+async function generateChatReply({
+  message,
+  conversationHistory = [],
+  topic = 'General Tech & CS',
+}: ChatParams) {
+  if (!message || typeof message !== 'string') {
+    throw new Error('Message string is required');
+  }
+
+  const ai = getGenAI();
+
+  const contents: Array<{ role: 'user' | 'model'; parts: Array<{ text: string }> }> = [];
+
+  if (Array.isArray(conversationHistory)) {
+    const recent = conversationHistory.slice(-10);
+    for (const msg of recent) {
+      if (msg && typeof msg.text === 'string' && (msg.sender === 'user' || msg.sender === 'ai')) {
+        contents.push({
+          role: msg.sender === 'user' ? 'user' : 'model',
+          parts: [{ text: msg.text }],
+        });
+      }
+    }
+  }
+
+  contents.push({
+    role: 'user',
+    parts: [{ text: message }],
+  });
+
+  const systemInstruction = `You are Nexora, an elite, patient, and knowledgeable AI Study Assistant designed for college students in computer science, software engineering, and technical disciplines.
+Context/Focus: ${topic}
+Guidelines:
+1. Explain technical concepts in a beginner-friendly, crystal-clear manner using relatable real-world analogies.
+2. Structure your answers with clean Markdown headings, bullet points, and code blocks (with syntax highlighting languages like python, javascript, sql, cpp, etc.).
+3. If an algorithmic or data structure question is asked (e.g., QuickSort, HashMaps, B-Trees), explain time/space complexity (Big-O) intuitively.
+4. If an OS or Database question is asked (e.g., Virtual Memory, ACID, Normalization), explain the "Why" and "How" before the nitty-gritty syntax.
+5. Provide concise examples and best practices.
+6. Keep the tone friendly, academic, encouraging, and clear. Avoid dry fluff.`;
+
+  const { text: reply, modelUsed } = await generateWithFallback(ai, {
+    contents,
+    systemInstruction,
+    temperature: 0.7,
+  });
+
+  return {
+    reply: reply || 'I could not generate a response at this time.',
+    modelUsed,
+  };
+}
 
 function setCors(res: any) {
   res.setHeader('Access-Control-Allow-Credentials', 'true');

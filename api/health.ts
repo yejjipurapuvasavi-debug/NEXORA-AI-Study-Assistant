@@ -1,4 +1,4 @@
-import { CANDIDATE_MODELS } from '../src/server/geminiService';
+const CANDIDATE_MODELS = ['gemini-3.1-flash-lite', 'gemini-flash-latest', 'gemini-3.8-flash'];
 
 function setCors(res: any) {
   res.setHeader('Access-Control-Allow-Credentials', 'true');
