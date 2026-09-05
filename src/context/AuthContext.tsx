@@ -55,7 +55,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         };
         setUser(profile);
         localStorage.removeItem(DEMO_USER_STORAGE_KEY);
-        await syncUserProfile(profile);
+        // Sync in background so auth state completion is not blocked by Firestore writes
+        syncUserProfile(profile).catch((e) =>
+          console.warn('Background Firestore profile sync:', e)
+        );
       } else {
         // If not a demo user, clear user
         const activeDemo = localStorage.getItem(DEMO_USER_STORAGE_KEY);
@@ -71,9 +74,53 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signInWithGoogle = async () => {
     setAuthError(null);
+
+    // If already authenticated, update state immediately
+    if (auth.currentUser) {
+      const existingUser = auth.currentUser;
+      const profile: StudentProfile = {
+        uid: existingUser.uid,
+        email: existingUser.email,
+        displayName: existingUser.displayName || 'Student Scholar',
+        photoURL: existingUser.photoURL,
+        isDemoUser: false,
+        lastLoginAt: new Date().toISOString(),
+      };
+      setUser(profile);
+      localStorage.removeItem(DEMO_USER_STORAGE_KEY);
+      syncUserProfile(profile).catch((e) =>
+        console.warn('Background Firestore profile sync:', e)
+      );
+      return;
+    }
+
     try {
-      const result = await signInWithPopup(auth, googleProvider);
-      if (result.user) {
+      // Safety timeout (45s) to guarantee signInWithPopup never hangs indefinitely
+      // if popup was closed or cross-origin messaging was blocked
+      const popupTimeout = new Promise<never>((_, reject) => {
+        const timer = setTimeout(() => {
+          const timeoutErr = new Error(
+            'Google Sign-In popup timed out. If the popup was closed or blocked by Chrome privacy settings, please try again or use Demo Student.'
+          );
+          (timeoutErr as unknown as { code: string }).code = 'auth/timeout';
+          reject(timeoutErr);
+        }, 45000);
+
+        // Cancel timeout if onAuthStateChanged fires before timeout
+        const unsub = onAuthStateChanged(auth, (u) => {
+          if (u) {
+            clearTimeout(timer);
+            unsub();
+          }
+        });
+      });
+
+      const result = await Promise.race([
+        signInWithPopup(auth, googleProvider),
+        popupTimeout,
+      ]);
+
+      if (result && result.user) {
         const profile: StudentProfile = {
           uid: result.user.uid,
           email: result.user.email,
@@ -84,17 +131,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         };
         setUser(profile);
         localStorage.removeItem(DEMO_USER_STORAGE_KEY);
-        await syncUserProfile(profile);
+        // Non-blocking sync to ensure modal and auth completion never stalls
+        syncUserProfile(profile).catch((e) =>
+          console.warn('Background Firestore profile sync:', e)
+        );
       }
     } catch (err: unknown) {
       const error = err as { code?: string; message?: string };
       console.error('Google Sign-In Error:', error);
+
       if (error?.code === 'auth/popup-blocked') {
-        setAuthError('Browser popup was blocked. Please allow popups or use "Demo Student" to preview immediately.');
+        setAuthError('Browser blocked the sign-in pop-up. Please allow popups in Chrome or use "Demo Student" to preview immediately.');
       } else if (error?.code === 'auth/popup-closed-by-user') {
-        setAuthError('Sign-in window was closed. Please try again.');
+        setAuthError('Sign-in popup was closed before completing. Please click "Continue with Google" again.');
       } else if (error?.code === 'auth/cancelled-popup-request') {
-        // user clicked again
+        setAuthError('Previous sign-in request was refreshed. Please click "Continue with Google" to proceed.');
+      } else if (error?.code === 'auth/unauthorized-domain') {
+        setAuthError('This domain is not authorized in your Firebase Authentication settings.');
+      } else if (error?.code === 'auth/timeout') {
+        setAuthError(error.message || 'Google Sign-In timed out. Please try again or use Demo Student.');
+      } else if (error?.code === 'auth/network-request-failed') {
+        setAuthError('Network error connecting to Firebase Authentication. Please check your internet connection.');
       } else {
         setAuthError(error?.message || 'Failed to sign in with Google. You can also sign in with Demo Student.');
       }

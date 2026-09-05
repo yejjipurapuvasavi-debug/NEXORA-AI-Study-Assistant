@@ -17,12 +17,29 @@ interface AuthModalProps {
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => {
-  const { signInWithGoogle, signInDemoStudent, authError, clearError } = useAuth();
+  const { user, signInWithGoogle, signInDemoStudent, authError, clearError } = useAuth();
   const [loadingGoogle, setLoadingGoogle] = useState(false);
+
+  // If user becomes authenticated (via completed popup or onAuthStateChanged), close modal and reset loading
+  React.useEffect(() => {
+    if (user && isOpen) {
+      setLoadingGoogle(false);
+      onSuccess();
+      onClose();
+    }
+  }, [user, isOpen, onSuccess, onClose]);
+
+  // Clean up loading state when modal closes
+  React.useEffect(() => {
+    if (!isOpen) {
+      setLoadingGoogle(false);
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
   const handleGoogleSignIn = async () => {
+    if (loadingGoogle) return;
     setLoadingGoogle(true);
     clearError();
     try {
@@ -30,7 +47,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
       onSuccess();
       onClose();
     } catch {
-      // Handled in context
+      // Handled in context; finally block resets loadingGoogle
     } finally {
       setLoadingGoogle(false);
     }
