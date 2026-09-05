@@ -1,0 +1,6 @@
+{
+  "name": "Nexora AI Study Assistant",
+  "description": "AI-powered learning assistant for college students with interactive Study Mode, AI technical question explanations, quizzes, and history tracking.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

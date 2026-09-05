@@ -1,0 +1,64 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile information",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase user ID" },
+        "email": { "type": "string", "description": "Student email address" },
+        "displayName": { "type": "string", "description": "Student display name" },
+        "photoURL": { "type": "string", "description": "Student photo avatar URL" },
+        "createdAt": { "type": "string", "description": "Account creation timestamp" },
+        "lastLoginAt": { "type": "string", "description": "Last sign-in timestamp" }
+      },
+      "required": ["uid", "email"]
+    },
+    "StudySession": {
+      "title": "StudySession",
+      "description": "Generated study session with explanations, concepts, and interactive quiz",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Session unique identifier" },
+        "userId": { "type": "string", "description": "Owner student user ID" },
+        "topic": { "type": "string", "description": "Subject or topic studied" },
+        "explanation": { "type": "string", "description": "Beginner-friendly explanation" },
+        "importantConcepts": { "type": "string", "description": "Core concepts and architecture" },
+        "realWorldExample": { "type": "string", "description": "Real-world practical analogy" },
+        "keyPoints": { "type": "string", "description": "Key takeaways" },
+        "quiz": { "type": "string", "description": "JSON string or list of 5 MCQs" },
+        "quizScore": { "type": "number", "description": "User score on quiz" },
+        "createdAt": { "type": "string", "description": "Session creation timestamp" }
+      },
+      "required": ["userId", "topic", "explanation"]
+    },
+    "ChatConversation": {
+      "title": "ChatConversation",
+      "description": "Technical Q&A chat conversation thread",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Conversation ID" },
+        "userId": { "type": "string", "description": "Owner student user ID" },
+        "title": { "type": "string", "description": "Chat topic summary" },
+        "messages": { "type": "string", "description": "Serialized message history" },
+        "createdAt": { "type": "string", "description": "Creation timestamp" },
+        "updatedAt": { "type": "string", "description": "Last update timestamp" }
+      },
+      "required": ["userId", "messages"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "Stores student profile data"
+    },
+    "/users/{userId}/sessions/{sessionId}": {
+      "schema": "StudySession",
+      "description": "Stores individual study sessions for the authenticated user"
+    },
+    "/users/{userId}/chats/{chatId}": {
+      "schema": "ChatConversation",
+      "description": "Stores AI chat conversations for the authenticated user"
+    }
+  }
+}
