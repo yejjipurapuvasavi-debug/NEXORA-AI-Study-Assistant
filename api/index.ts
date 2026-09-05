@@ -16,7 +16,7 @@ function getGenAI() {
       'GEMINI_API_KEY is not configured. Please ensure GEMINI_API_KEY is added to your environment variables or Vercel Project Settings.'
     );
   }
-  const cleanKey = rawKey.trim().replace(/^["']|["']$/g, '').trim();
+  const cleanKey = rawKey.replace(/[\r\n\t ]/g, '').replace(/^["']|["']$/g, '').trim();
   if (!cleanKey) {
     throw new Error(
       'GEMINI_API_KEY is empty after sanitization. Please verify your environment variable value.'
@@ -24,6 +24,7 @@ function getGenAI() {
   }
   return new GoogleGenAI({
     apiKey: cleanKey,
+    vertexai: false,
     httpOptions: {
       headers: {
         'User-Agent': 'aistudio-build',
@@ -343,13 +344,17 @@ export default async function handler(req: any, res: any) {
 
   // Health / Default
   const rawKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
-  const hasApiKey = !!(rawKey && rawKey.trim().replace(/^["']|["']$/g, '').trim().length > 0);
+  const cleanKey = rawKey ? rawKey.replace(/[\r\n\t ]/g, '').replace(/^["']|["']$/g, '').trim() : '';
+  const hasApiKey = cleanKey.length > 0;
 
   return res.status(200).json({
     status: 'ok',
     appName: 'Nexora AI Study Assistant',
     hasApiKey,
     keySource: process.env.GEMINI_API_KEY ? 'GEMINI_API_KEY' : process.env.GOOGLE_API_KEY ? 'GOOGLE_API_KEY' : 'none',
+    keyLength: cleanKey.length,
+    authType: 'Gemini Developer API (ai.google.dev)',
+    vertexai: false,
     primaryModel: CANDIDATE_MODELS[0],
     timestamp: new Date().toISOString(),
   });

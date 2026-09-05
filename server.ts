@@ -18,13 +18,17 @@ app.use(express.json({ limit: '10mb' }));
 // Health check endpoint
 app.get('/api/health', (_req, res) => {
   const rawKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
-  const hasApiKey = !!(rawKey && rawKey.trim().replace(/^["']|["']$/g, '').trim().length > 0);
+  const cleanKey = rawKey ? rawKey.replace(/[\r\n\t ]/g, '').replace(/^["']|["']$/g, '').trim() : '';
+  const hasApiKey = cleanKey.length > 0;
 
   res.json({
     status: 'ok',
     appName: 'Nexora AI Study Assistant',
     hasApiKey,
     keySource: process.env.GEMINI_API_KEY ? 'GEMINI_API_KEY' : process.env.GOOGLE_API_KEY ? 'GOOGLE_API_KEY' : 'none',
+    keyLength: cleanKey.length,
+    authType: 'Gemini Developer API (ai.google.dev)',
+    vertexai: false,
     primaryModel: CANDIDATE_MODELS[0],
     timestamp: new Date().toISOString(),
   });

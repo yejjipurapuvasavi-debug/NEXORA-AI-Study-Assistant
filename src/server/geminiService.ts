@@ -15,7 +15,7 @@ export function getGenAI() {
       'GEMINI_API_KEY is not configured. Please ensure GEMINI_API_KEY is added to your environment variables or Vercel Project Settings.'
     );
   }
-  const cleanKey = rawKey.trim().replace(/^["']|["']$/g, '').trim();
+  const cleanKey = rawKey.replace(/[\r\n\t ]/g, '').replace(/^["']|["']$/g, '').trim();
   if (!cleanKey) {
     throw new Error(
       'GEMINI_API_KEY is empty after sanitization. Please verify your environment variable value.'
@@ -23,6 +23,7 @@ export function getGenAI() {
   }
   return new GoogleGenAI({
     apiKey: cleanKey,
+    vertexai: false,
     httpOptions: {
       headers: {
         'User-Agent': 'aistudio-build',
