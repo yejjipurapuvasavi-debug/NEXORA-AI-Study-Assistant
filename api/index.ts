@@ -10,13 +10,26 @@ try {
 const CANDIDATE_MODELS = ['gemini-3.1-flash-lite', 'gemini-flash-latest', 'gemini-3.8-flash'];
 
 function getGenAI() {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
+  const rawKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+  if (!rawKey) {
     throw new Error(
       'GEMINI_API_KEY is not configured. Please ensure GEMINI_API_KEY is added to your environment variables or Vercel Project Settings.'
     );
   }
-  return new GoogleGenAI({ apiKey });
+  const cleanKey = rawKey.trim().replace(/^["']|["']$/g, '').trim();
+  if (!cleanKey) {
+    throw new Error(
+      'GEMINI_API_KEY is empty after sanitization. Please verify your environment variable value.'
+    );
+  }
+  return new GoogleGenAI({
+    apiKey: cleanKey,
+    httpOptions: {
+      headers: {
+        'User-Agent': 'aistudio-build',
+      },
+    },
+  });
 }
 
 interface GenerateOptions {
@@ -329,10 +342,14 @@ export default async function handler(req: any, res: any) {
   }
 
   // Health / Default
+  const rawKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+  const hasApiKey = !!(rawKey && rawKey.trim().replace(/^["']|["']$/g, '').trim().length > 0);
+
   return res.status(200).json({
     status: 'ok',
     appName: 'Nexora AI Study Assistant',
-    hasApiKey: !!process.env.GEMINI_API_KEY,
+    hasApiKey,
+    keySource: process.env.GEMINI_API_KEY ? 'GEMINI_API_KEY' : process.env.GOOGLE_API_KEY ? 'GOOGLE_API_KEY' : 'none',
     primaryModel: CANDIDATE_MODELS[0],
     timestamp: new Date().toISOString(),
   });

@@ -16,10 +16,14 @@ export default async function handler(req: any, res: any) {
     return res.status(200).end();
   }
 
+  const rawKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+  const hasApiKey = !!(rawKey && rawKey.trim().replace(/^["']|["']$/g, '').trim().length > 0);
+
   return res.status(200).json({
     status: 'ok',
     appName: 'Nexora AI Study Assistant',
-    hasApiKey: !!process.env.GEMINI_API_KEY,
+    hasApiKey,
+    keySource: process.env.GEMINI_API_KEY ? 'GEMINI_API_KEY' : process.env.GOOGLE_API_KEY ? 'GOOGLE_API_KEY' : 'none',
     primaryModel: CANDIDATE_MODELS[0],
     timestamp: new Date().toISOString(),
   });
