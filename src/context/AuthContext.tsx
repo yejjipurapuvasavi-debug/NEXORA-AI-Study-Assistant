@@ -14,6 +14,8 @@ interface AuthContextType {
   user: StudentProfile | null;
   loading: boolean;
   authError: string | null;
+  authErrorCode: string | null;
+  detectedDomain: string;
   signInWithGoogle: () => Promise<void>;
   signInDemoStudent: (customName?: string) => void;
   logout: () => Promise<void>;
@@ -28,6 +30,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<StudentProfile | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [authErrorCode, setAuthErrorCode] = useState<string | null>(null);
+
+  const detectedDomain = typeof window !== 'undefined' ? window.location.hostname : '';
 
   useEffect(() => {
     // Check if a demo session was active
@@ -140,17 +145,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const error = err as { code?: string; message?: string };
       console.error('Google Sign-In Error:', error);
 
-      if (error?.code === 'auth/popup-blocked') {
+      const code = error?.code || 'unknown';
+      setAuthErrorCode(code);
+
+      if (code === 'auth/popup-blocked') {
         setAuthError('Browser blocked the sign-in pop-up. Please allow popups in Chrome or use "Demo Student" to preview immediately.');
-      } else if (error?.code === 'auth/popup-closed-by-user') {
+      } else if (code === 'auth/popup-closed-by-user') {
         setAuthError('Sign-in popup was closed before completing. Please click "Continue with Google" again.');
-      } else if (error?.code === 'auth/cancelled-popup-request') {
+      } else if (code === 'auth/cancelled-popup-request') {
         setAuthError('Previous sign-in request was refreshed. Please click "Continue with Google" to proceed.');
-      } else if (error?.code === 'auth/unauthorized-domain') {
-        setAuthError('This domain is not authorized in your Firebase Authentication settings.');
-      } else if (error?.code === 'auth/timeout') {
-        setAuthError(error.message || 'Google Sign-In timed out. Please try again or use Demo Student.');
-      } else if (error?.code === 'auth/network-request-failed') {
+      } else if (code === 'auth/unauthorized-domain') {
+        const currentHost = typeof window !== 'undefined' ? window.location.hostname : '';
+        setAuthError(`This domain (${currentHost || 'preview host'}) is not authorized in your Firebase Authentication settings.`);
+      } else if (code === 'auth/timeout') {
+        setAuthError(error?.message || 'Google Sign-In timed out. Please try again or use Demo Student.');
+      } else if (code === 'auth/network-request-failed') {
         setAuthError('Network error connecting to Firebase Authentication. Please check your internet connection.');
       } else {
         setAuthError(error?.message || 'Failed to sign in with Google. You can also sign in with Demo Student.');
@@ -171,6 +180,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(demoProfile);
     localStorage.setItem(DEMO_USER_STORAGE_KEY, JSON.stringify(demoProfile));
     setAuthError(null);
+    setAuthErrorCode(null);
   };
 
   const logout = async () => {
@@ -184,7 +194,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const clearError = () => setAuthError(null);
+  const clearError = () => {
+    setAuthError(null);
+    setAuthErrorCode(null);
+  };
 
   return (
     <AuthContext.Provider
@@ -192,6 +205,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         user,
         loading,
         authError,
+        authErrorCode,
+        detectedDomain,
         signInWithGoogle,
         signInDemoStudent,
         logout,

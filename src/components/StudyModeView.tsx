@@ -60,6 +60,8 @@ export const StudyModeView: React.FC<StudyModeViewProps> = ({
   ];
 
   const handleGenerate = async (topicToFetch?: string) => {
+    if (loading) return;
+
     const targetTopic = topicToFetch || topicInput.trim();
     if (!targetTopic) {
       setError('Please enter a topic to study');
@@ -77,6 +79,11 @@ export const StudyModeView: React.FC<StudyModeViewProps> = ({
     setQuizSubmitted(false);
     setScore(null);
 
+    const controller = new AbortController();
+    const timer = setTimeout(() => {
+      controller.abort();
+    }, 30000);
+
     try {
       const response = await fetch('/api/study-mode', {
         method: 'POST',
@@ -86,7 +93,10 @@ export const StudyModeView: React.FC<StudyModeViewProps> = ({
           depth,
           studentLevel: 'College Undergraduate',
         }),
+        signal: controller.signal,
       });
+
+      clearTimeout(timer);
 
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}));
@@ -108,14 +118,23 @@ export const StudyModeView: React.FC<StudyModeViewProps> = ({
       };
 
       setCurrentSession(newSession);
+      setLoading(false);
 
-      // Automatically persist session to Cloud Firestore
-      await saveStudySessionToFirestore(user.uid, newSession);
+      // Automatically persist session to Cloud Firestore in background without blocking UI
+      saveStudySessionToFirestore(user.uid, newSession).catch((err) => {
+        console.warn('Background Firestore save notice:', err);
+      });
     } catch (err: unknown) {
-      const e = err as Error;
+      clearTimeout(timer);
+      const e = err as any;
       console.error('Study guide error:', e);
-      setError(e.message || 'Failed to generate study guide. Please try again.');
+      if (e.name === 'AbortError') {
+        setError('Study guide generation timed out after 30 seconds. Gemini took too long to respond. Please try again or select another topic.');
+      } else {
+        setError(e.message || 'Failed to generate study guide. Please try again.');
+      }
     } finally {
+      clearTimeout(timer);
       setLoading(false);
     }
   };
@@ -193,8 +212,11 @@ export const StudyModeView: React.FC<StudyModeViewProps> = ({
             {['Fundamentals', 'Comprehensive Core', 'Exam Cram'].map((lvl) => (
               <button
                 key={lvl}
+                disabled={loading}
                 onClick={() => setDepth(lvl)}
                 className={`px-3 py-1.5 rounded-lg transition-colors ${
+                  loading ? 'opacity-60 cursor-not-allowed' : ''
+                } ${
                   depth === lvl
                     ? 'bg-white text-violet-700 shadow-xs'
                     : 'hover:text-slate-900'
@@ -214,11 +236,12 @@ export const StudyModeView: React.FC<StudyModeViewProps> = ({
               <input
                 id="study-mode-topic-input"
                 type="text"
+                disabled={loading}
                 value={topicInput}
                 onChange={(e) => setTopicInput(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleGenerate()}
+                onKeyDown={(e) => e.key === 'Enter' && !loading && handleGenerate()}
                 placeholder="Enter a topic (e.g., Python, DBMS, DSA, Operating Systems, Machine Learning)..."
-                className="w-full pl-11 pr-4 py-3.5 rounded-xl border border-slate-300 focus:outline-hidden focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500 text-sm placeholder:text-slate-400 font-medium"
+                className="w-full pl-11 pr-4 py-3.5 rounded-xl border border-slate-300 focus:outline-hidden focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500 text-sm placeholder:text-slate-400 font-medium disabled:opacity-60 disabled:bg-slate-50"
               />
             </div>
             <button
@@ -252,11 +275,17 @@ export const StudyModeView: React.FC<StudyModeViewProps> = ({
               return (
                 <button
                   key={item.label}
+                  disabled={loading}
                   onClick={() => {
+                    if (loading) return;
                     setTopicInput(item.label);
                     handleGenerate(item.label);
                   }}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-violet-50 hover:border-violet-300 text-xs font-medium text-slate-700 hover:text-violet-700 transition-colors"
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
+                    loading
+                      ? 'border-slate-200 bg-slate-100 text-slate-400 opacity-60 cursor-not-allowed'
+                      : 'border-slate-200 bg-slate-50 hover:bg-violet-50 hover:border-violet-300 text-slate-700 hover:text-violet-700 cursor-pointer'
+                  }`}
                 >
                   <Icon className="w-3.5 h-3.5 text-slate-500" />
                   <span>{item.label}</span>

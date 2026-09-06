@@ -58,10 +58,13 @@ export async function saveStudySessionToFirestore(
   // Persist to Cloud Firestore under /users/{userId}/sessions/{sessionId}
   try {
     const sessionRef = doc(db, 'users', userId, 'sessions', session.id);
-    await setDoc(sessionRef, {
+    const savePromise = setDoc(sessionRef, {
       ...session,
       updatedAt: new Date().toISOString(),
     });
+    // Guard against hanging if network/auth is disconnected or pending in iframe
+    const timeoutPromise = new Promise((resolve) => setTimeout(resolve, 4000));
+    await Promise.race([savePromise, timeoutPromise]);
   } catch (error) {
     console.warn('Firestore session save notice:', error);
   }

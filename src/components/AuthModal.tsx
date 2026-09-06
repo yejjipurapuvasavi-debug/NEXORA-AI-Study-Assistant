@@ -7,8 +7,13 @@ import {
   Loader2,
   GraduationCap,
   ArrowRight,
+  Copy,
+  Check,
+  ExternalLink,
+  Globe,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import firebaseConfig from '../../firebase-applet-config.json';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -17,8 +22,29 @@ interface AuthModalProps {
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess }) => {
-  const { user, signInWithGoogle, signInDemoStudent, authError, clearError } = useAuth();
+  const { user, signInWithGoogle, signInDemoStudent, authError, authErrorCode, detectedDomain, clearError } = useAuth();
   const [loadingGoogle, setLoadingGoogle] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const currentHost = detectedDomain || (typeof window !== 'undefined' ? window.location.hostname : '');
+  const firebaseSettingsUrl = `https://console.firebase.google.com/project/${firebaseConfig.projectId}/authentication/settings`;
+
+  const isUnauthorizedDomain =
+    authErrorCode === 'auth/unauthorized-domain' ||
+    Boolean(authError && authError.toLowerCase().includes('not authorized'));
+
+  const handleCopyDomain = async () => {
+    if (!currentHost) return;
+    try {
+      await navigator.clipboard.writeText(currentHost);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    } catch {
+      // Fallback
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    }
+  };
 
   // If user becomes authenticated (via completed popup or onAuthStateChanged), close modal and reset loading
   React.useEffect(() => {
@@ -89,13 +115,66 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onSuccess
 
         <div className="p-6 space-y-4">
           {authError && (
-            <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 flex items-start gap-2.5 text-amber-900 text-xs leading-relaxed">
-              <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-              <div>
-                <p className="font-semibold">Sign-in Notice</p>
-                <p>{authError}</p>
+            isUnauthorizedDomain ? (
+              <div id="unauthorized-domain-guide" className="p-4 rounded-xl bg-amber-50/90 border border-amber-300/80 text-amber-950 text-xs space-y-3">
+                <div className="flex items-start gap-2.5">
+                  <Globe className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-bold text-slate-900 text-sm">Firebase Authorized Domain Required</p>
+                    <p className="text-slate-600 mt-0.5 text-xs">
+                      Your Firebase project (<span className="font-semibold text-violet-700">{firebaseConfig.projectId}</span>) requires this preview environment domain to be added to its Authorized Domains list.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Domain display and copy */}
+                <div className="bg-white p-2.5 rounded-lg border border-amber-200 flex items-center justify-between gap-2 shadow-2xs">
+                  <div className="min-w-0 flex-1">
+                    <span className="text-[10px] uppercase tracking-wider font-semibold text-slate-400 block">Preview Domain</span>
+                    <code className="text-xs font-mono font-bold text-slate-800 break-all select-all">
+                      {currentHost || 'ais-dev-qqzzlgqjaw3ogxd6kjaitd-528837826501.asia-east1.run.app'}
+                    </code>
+                  </div>
+                  <button
+                    id="copy-preview-domain-btn"
+                    type="button"
+                    onClick={handleCopyDomain}
+                    className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-violet-600 hover:bg-violet-700 text-white font-medium text-xs transition-colors shadow-2xs cursor-pointer"
+                  >
+                    {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{copied ? 'Copied!' : 'Copy'}</span>
+                  </button>
+                </div>
+
+                {/* Direct link & 3-step action */}
+                <div className="space-y-1.5 text-slate-700">
+                  <p className="font-semibold text-[11px] text-slate-800">Quick 3-step fix in Firebase Console:</p>
+                  <ol className="list-decimal list-inside space-y-1 text-[11px] pl-1 text-slate-600">
+                    <li>
+                      Open{' '}
+                      <a
+                        href={firebaseSettingsUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-semibold text-violet-700 hover:underline inline-flex items-center gap-0.5"
+                      >
+                        Firebase Auth Settings <ExternalLink className="w-3 h-3 inline" />
+                      </a>
+                    </li>
+                    <li>Scroll down to <strong>Authorized domains</strong> and click <strong>Add domain</strong></li>
+                    <li>Paste the preview domain and click <strong>Save</strong></li>
+                  </ol>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 flex items-start gap-2.5 text-amber-900 text-xs leading-relaxed">
+                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-semibold">Sign-in Notice</p>
+                  <p>{authError}</p>
+                </div>
+              </div>
+            )
           )}
 
           {/* Primary Google Sign-In */}
